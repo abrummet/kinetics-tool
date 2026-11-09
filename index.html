@@ -1,0 +1,938 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Kinetics Graph Maker</title>
+<meta name="description" content="Make print-ready zero-, first- and second-order kinetics graphs for worksheets and exams.">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-screen app. Left = tabbed controls, right = toolbar + paper preview that always fits. */
+:root{
+  --bg:#ECEFF2; --panel:#FFFFFF; --soft:#F4F6F8; --ink:#17202A; --muted:#5A6776; --line:#D3DAE1;
+  --accent:#1D5E73; --accent-ink:#FFFFFF; --accent-soft:#DCEAEE; --paper:#FFFFFF; --danger:#A23B2A;
+  --shadow:0 1px 2px rgba(18,28,38,.08),0 10px 30px rgba(18,28,38,.12);
+  --ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11161B; --panel:#192027; --soft:#202931; --ink:#E3E8ED; --muted:#93A1AF; --line:#2D3842;
+  --accent:#72B6CA; --accent-ink:#0D1A1F; --accent-soft:#1E3A44; --paper:#FFFFFF; --danger:#E08A79;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.4); color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#11161B; --panel:#192027; --soft:#202931; --ink:#E3E8ED; --muted:#93A1AF; --line:#2D3842;
+  --accent:#72B6CA; --accent-ink:#0D1A1F; --accent-soft:#1E3A44; --paper:#FFFFFF; --danger:#E08A79;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.4); color-scheme:dark }
+
+html,body{height:100%}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.35 var(--ui);overflow:hidden}
+*{box-sizing:border-box}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+.app{height:100%;display:grid;grid-template-rows:auto 1fr}
+header{display:flex;align-items:center;gap:16px;background:var(--panel);border-bottom:1px solid var(--line);
+  padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px;letter-spacing:.01em;white-space:nowrap}
+.brand svg{flex:none}
+.brand small{font-weight:400;color:var(--muted);font-size:12px}
+.actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:7px;border:1px solid var(--line);
+  background:var(--panel);cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{background:var(--soft)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn:disabled{opacity:.55;cursor:progress}
+.btn svg{width:15px;height:15px}
+
+.main{display:grid;grid-template-columns:340px minmax(0,1fr);min-height:0}
+aside{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--line);padding:0 8px}
+.tabs button{border:0;background:none;padding:10px 4px 9px;cursor:pointer;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.pane{flex:1;overflow:auto;padding:14px 16px 16px;display:flex;flex-direction:column;gap:14px}
+.pane[hidden]{display:none!important}
+.group{display:flex;flex-direction:column;gap:8px}
+.group h3{margin:0;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.row{display:grid;grid-template-columns:96px minmax(0,1fr);align-items:center;gap:8px;min-height:30px}
+.row>label:first-child,.row>.lab{color:var(--muted)}
+.inline{display:flex;gap:6px;align-items:center;min-width:0}
+.inline>*{min-width:0}
+input[type=text],input[type=number],select{height:30px;border:1px solid var(--line);border-radius:6px;background:var(--panel);padding:0 8px;width:100%;min-width:0}
+input[type=number]{font-family:var(--mono);font-size:12.5px;padding-right:2px}
+input:disabled,select:disabled{opacity:.45}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.unit{color:var(--muted);font-size:12px;white-space:nowrap}
+.check{display:flex;align-items:center;gap:8px;cursor:pointer;min-height:26px}
+.check input{width:16px;height:16px;accent-color:var(--accent);margin:0}
+.hint{color:var(--muted);font-size:11.5px;line-height:1.4}
+.hint code{font-family:var(--mono);font-size:11px;background:var(--soft);padding:0 3px;border-radius:3px}
+.val{font-family:var(--mono);font-size:12px;color:var(--muted);min-width:42px;text-align:right}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;background:var(--panel);overflow:hidden;flex:none}
+.seg button{border:0;background:none;padding:0 11px;height:30px;cursor:pointer;white-space:nowrap;color:var(--ink)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg button:disabled{opacity:.4;cursor:not-allowed}
+.seg.full{display:flex}.seg.full button{flex:1;padding:0 4px}
+
+.series-head,.srow{display:grid;grid-template-columns:30px 1fr 1fr 1.15fr 24px;gap:5px;align-items:center}
+.series-head{font-size:11.5px;color:var(--muted)}
+.srow svg{width:30px;height:18px;display:block}
+.icon-btn{width:24px;height:24px;border:0;background:none;border-radius:5px;cursor:pointer;color:var(--muted);display:grid;place-items:center}
+.icon-btn:hover{background:var(--soft);color:var(--danger)}
+.icon-btn:disabled{visibility:hidden}
+.add{align-self:flex-start}
+
+.stage{display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-width:0;min-height:0}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:12px 20px 4px}
+.tgroup{display:flex;align-items:center;gap:8px}
+.tgroup>span{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;user-select:none}
+.switch input{position:absolute;opacity:0;width:1px;height:1px}
+.switch .track{width:34px;height:20px;border-radius:10px;background:var(--line);position:relative;transition:background .15s}
+.switch .track::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--panel);box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+.switch input:checked+.track{background:var(--accent)}
+.switch input:checked+.track::after{transform:translateX(14px)}
+.switch input:focus-visible+.track{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{min-height:0;display:grid;place-items:center;padding:14px 20px;overflow:hidden}
+.paper{background:var(--paper);box-shadow:var(--shadow);line-height:0}
+.paper svg{display:block}
+.foot{display:flex;flex-wrap:wrap;gap:4px 16px;justify-content:space-between;padding:0 20px 10px;color:var(--muted);font-size:12px}
+.foot b{font-family:var(--mono);font-weight:500;color:var(--ink)}
+.linkbtn{border:0;background:none;color:var(--muted);text-decoration:underline;cursor:pointer;padding:0;font-size:12px}
+.linkbtn:hover{color:var(--danger)}
+
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;
+  background:var(--ink);color:var(--panel);padding:9px 14px;border-radius:8px;font-weight:500;transition:all .2s;max-width:calc(100% - 32px);text-align:center;z-index:20}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+@media (max-width:820px){
+  body{overflow:auto}
+  html,body{height:auto}
+  .app{height:auto}
+  .main{grid-template-columns:1fr}
+  aside{order:2;border-right:0;border-top:1px solid var(--line)}
+  .wrap{height:62vh}
+  .toolbar,.foot,.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .brand small{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="1" y="1" width="24" height="24" rx="6" fill="var(--accent)"/><path d="M6 6v14h14" stroke="var(--accent-ink)" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M7.5 8c2 6 5 9.5 11.5 10" stroke="var(--accent-ink)" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>
+      Kinetics Graph Maker <small>for worksheets and exams</small>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="copyBtn" type="button" title="Copy a high-resolution PNG to the clipboard">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"/></svg>Copy image</button>
+      <button class="btn" id="pngBtn" type="button" title="Download PNG at the chosen resolution">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 2v8m-3.5-3.5L8 10l3.5-3.5M2.5 13.5h11"/></svg>PNG</button>
+      <button class="btn" id="svgBtn" type="button" title="Download SVG (vector, sharp at any size)">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 2v8m-3.5-3.5L8 10l3.5-3.5M2.5 13.5h11"/></svg>SVG</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <aside>
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-reaction" aria-selected="true" data-tab="reaction">Reaction</button>
+        <button role="tab" id="tab-data" aria-selected="false" data-tab="data">Data</button>
+        <button role="tab" id="tab-axes" aria-selected="false" data-tab="axes">Axes</button>
+        <button role="tab" id="tab-style" aria-selected="false" data-tab="style">Style</button>
+      </div>
+
+      <!-- REACTION -->
+      <div class="pane" id="pane-reaction" role="tabpanel">
+        <div class="group">
+          <h3>Species and units</h3>
+          <div class="row"><label for="species">Species</label><input id="species" type="text" data-k="species" maxlength="16" autocomplete="off"></div>
+          <div class="hint" style="margin-top:-4px">Numbers after letters become subscripts: N2O5 → N<sub>2</sub>O<sub>5</sub></div>
+          <div class="row"><label for="concUnit">Concentration</label>
+            <select id="concUnit" data-k="concUnit"><option>M</option><option>mM</option><option>µM</option><option>atm</option><option>kPa</option><option>torr</option></select></div>
+          <div class="row"><label for="timeUnit">Time</label>
+            <select id="timeUnit" data-k="timeUnit"><option value="ms">milliseconds (ms)</option><option value="s">seconds (s)</option><option value="min">minutes (min)</option><option value="h">hours (h)</option><option value="d">days (d)</option><option value="yr">years (yr)</option></select></div>
+        </div>
+        <div class="group">
+          <h3>Curves</h3>
+          <div class="series-head" id="seriesHead"></div>
+          <div id="seriesRows" class="group" style="gap:6px"></div>
+          <button class="btn add" id="addSeries" type="button">+ Add curve</button>
+          <div class="hint">Up to 4 curves. Black-and-white styles keep each curve readable on a photocopy. Leave a label blank to have it written for you.</div>
+        </div>
+      </div>
+
+      <!-- DATA -->
+      <div class="pane" id="pane-data" role="tabpanel" hidden>
+        <div class="group">
+          <h3>Show</h3>
+          <label class="check"><input type="checkbox" id="showLine" data-k="showLine">Line (curve or best-fit line)</label>
+          <label class="check"><input type="checkbox" id="showPoints" data-k="showPoints">Data points</label>
+          <div class="hint">Turn both off for blank labeled axes that students plot on.</div>
+        </div>
+        <div class="group">
+          <h3>Data points</h3>
+          <div class="row"><label for="nPoints">Points</label><div class="inline"><input type="range" id="nPoints" data-k="nPoints" min="4" max="16" step="1"><span class="val" id="nPointsVal"></span></div></div>
+          <div class="row"><span class="lab">Values</span>
+            <div class="seg full" data-seg="noisy" data-bool="1"><button type="button" data-v="0">Perfect</button><button type="button" data-v="1">Experimental</button></div></div>
+          <div class="row"><label for="noise">Scatter</label><div class="inline"><input type="range" id="noise" data-k="noise" min="1" max="12" step="0.5"><span class="val" id="noiseVal"></span></div></div>
+          <div class="row"><span class="lab"></span><button class="btn" id="reroll" type="button" style="justify-self:start">New random scatter</button></div>
+          <label class="check"><input type="checkbox" id="fitLine" data-k="fitLine">Fit the line to the scattered points (least squares) when the plot is linear</label>
+        </div>
+        <div class="group">
+          <h3>Tangent line</h3>
+          <label class="check"><input type="checkbox" id="tangentOn" data-k="tangentOn">Draw a tangent line</label>
+          <div class="row"><label for="tangentT">At time</label><div class="inline"><input type="number" id="tangentT" data-k="tangentT" step="any" min="0"><span class="unit" id="tangentUnit"></span></div></div>
+          <div class="row"><label for="tangentSeries">On curve</label><select id="tangentSeries" data-k="tangentSeries" data-num="1"></select></div>
+          <div class="hint">The answer key adds the tangent slope (the instantaneous rate).</div>
+        </div>
+      </div>
+
+      <!-- AXES -->
+      <div class="pane" id="pane-axes" role="tabpanel" hidden>
+        <div class="group">
+          <h3>Time axis</h3>
+          <label class="check"><input type="checkbox" id="tAuto" data-k="tAuto">Automatic range</label>
+          <div class="two">
+            <div class="row" style="grid-template-columns:34px 1fr"><label for="tMax">Max</label><input type="number" id="tMax" data-k="tMax" step="any" min="0"></div>
+            <div class="row" style="grid-template-columns:34px 1fr"><label for="tStep">Step</label><input type="number" id="tStep" data-k="tStep" step="any" min="0"></div>
+          </div>
+        </div>
+        <div class="group">
+          <h3>Y axis</h3>
+          <label class="check"><input type="checkbox" id="yAuto" data-k="yAuto">Automatic range</label>
+          <label class="check"><input type="checkbox" id="yZero" data-k="yZero">Start at zero ([A] and 1/[A] plots)</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+            <input type="number" id="yMin" data-k="yMin" step="any" aria-label="Y minimum" placeholder="min">
+            <input type="number" id="yMax" data-k="yMax" step="any" aria-label="Y maximum" placeholder="max">
+            <input type="number" id="yStep" data-k="yStep" step="any" min="0" aria-label="Y step" placeholder="step">
+          </div>
+          <div class="hint" id="yHint">Min, max, step. A manual y range is ignored in the 3 plot types layout.</div>
+        </div>
+        <div class="group">
+          <h3>Ticks</h3>
+          <div class="row"><label for="minorDiv">Minor ticks</label><select id="minorDiv" data-k="minorDiv"><option value="auto">Automatic</option><option value="2">2 per step</option><option value="4">4 per step</option><option value="5">5 per step</option><option value="10">10 per step</option></select></div>
+          <div class="row"><label for="xDec">Time decimals</label><select id="xDec" data-k="xDec"><option value="auto">Automatic</option><option>0</option><option>1</option><option>2</option><option>3</option></select></div>
+          <div class="row"><label for="yDec">Y decimals</label><select id="yDec" data-k="yDec"><option value="auto">Automatic</option><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
+        </div>
+        <div class="group">
+          <h3>Labels</h3>
+          <div class="row"><label for="title">Title</label><input type="text" id="title" data-k="title" placeholder="none"></div>
+          <div class="row"><label for="xLabel">Time label</label><input type="text" id="xLabel" data-k="xLabel" placeholder="automatic"></div>
+          <div class="row"><label for="yLabel">Y label</label><input type="text" id="yLabel" data-k="yLabel" placeholder="automatic"></div>
+          <div class="hint">Use <code>_{2}</code> for subscripts and <code>^{−1}</code> for superscripts.</div>
+        </div>
+      </div>
+
+      <!-- STYLE -->
+      <div class="pane" id="pane-style" role="tabpanel" hidden>
+        <div class="group">
+          <h3>Size on paper</h3>
+          <div class="row"><label for="size">Preset</label>
+            <select id="size" data-k="size">
+              <option value="small">Small · 3.25 × 2.5 in</option>
+              <option value="medium">Medium · 4.5 × 3.25 in</option>
+              <option value="wide">Full width · 6.5 × 4 in</option>
+              <option value="square">Square · 4 × 4 in</option>
+              <option value="strip">Panel strip · 7.5 × 3 in</option>
+              <option value="custom">Custom</option>
+            </select></div>
+          <div class="two">
+            <div class="row" style="grid-template-columns:40px 1fr"><label for="w">Width</label><div class="inline"><input type="number" id="w" data-k="w" step="0.25" min="1.5" max="10"><span class="unit">in</span></div></div>
+            <div class="row" style="grid-template-columns:40px 1fr"><label for="h">Height</label><div class="inline"><input type="number" id="h" data-k="h" step="0.25" min="1.25" max="10"><span class="unit">in</span></div></div>
+          </div>
+        </div>
+        <div class="group">
+          <h3>Text and lines</h3>
+          <div class="row"><label for="fontFamily">Font</label><select id="fontFamily" data-k="fontFamily"><option>Arial</option><option>Helvetica</option><option value="Times">Times New Roman</option><option>Verdana</option></select></div>
+          <div class="row"><label for="fontScale">Text size</label><div class="inline"><input type="range" id="fontScale" data-k="fontScale" min="75" max="150" step="5"><span class="val" id="fontScaleVal"></span></div></div>
+          <div class="row"><span class="lab">Line weight</span>
+            <div class="seg full" data-seg="lineW" data-num="1"><button type="button" data-v="1">Thin</button><button type="button" data-v="1.5">Medium</button><button type="button" data-v="2.25">Thick</button></div></div>
+        </div>
+        <div class="group">
+          <h3>Grid and frame</h3>
+          <div class="two"><label class="check"><input type="checkbox" id="gridMajor" data-k="gridMajor">Major grid</label><label class="check"><input type="checkbox" id="gridMinor" data-k="gridMinor">Minor grid</label></div>
+          <div class="row"><span class="lab">Grid shade</span>
+            <div class="seg full" data-seg="gridTone"><button type="button" data-v="light">Light</button><button type="button" data-v="medium">Medium</button><button type="button" data-v="dark">Dark</button></div></div>
+          <div class="two"><label class="check"><input type="checkbox" id="frame" data-k="frame">Box frame</label><label class="check"><input type="checkbox" id="ticksOut" data-k="ticksOut">Ticks outside</label></div>
+        </div>
+        <div class="group">
+          <h3>Legend</h3>
+          <div class="two">
+            <select id="legendShow" data-k="legendShow" aria-label="Legend visibility"><option value="auto">Show if 2+ curves</option><option value="on">Always show</option><option value="off">Hide</option></select>
+            <select id="legendPos" data-k="legendPos" aria-label="Legend position"><option value="auto">Best spot</option><option value="tr">Top right</option><option value="tl">Top left</option><option value="br">Bottom right</option><option value="bl">Bottom left</option></select>
+          </div>
+        </div>
+        <div class="group">
+          <h3>Output</h3>
+          <label class="check"><input type="checkbox" id="color" data-k="color">Color curves (black and white is best for photocopies)</label>
+          <label class="check"><input type="checkbox" id="panelLetters" data-k="panelLetters">Label panels (a), (b), (c)</label>
+          <div class="row"><label for="dpi">Resolution</label><select id="dpi" data-k="dpi" data-num="1"><option value="150">150 dpi (screen)</option><option value="300">300 dpi (print)</option><option value="600">600 dpi (high)</option></select></div>
+        </div>
+      </div>
+    </aside>
+
+    <section class="stage">
+      <div class="toolbar">
+        <div class="tgroup"><span>Order</span>
+          <div class="seg" data-seg="order" data-num="1" id="orderSeg"><button type="button" data-v="0">Zero</button><button type="button" data-v="1">First</button><button type="button" data-v="2">Second</button></div></div>
+        <div class="tgroup"><span>Plot vs time</span>
+          <div class="seg" data-seg="plot" id="plotSeg"><button type="button" data-v="conc"></button><button type="button" data-v="ln"></button><button type="button" data-v="inv"></button></div></div>
+        <div class="tgroup"><span>Layout</span>
+          <div class="seg" data-seg="layout"><button type="button" data-v="single">Single</button><button type="button" data-v="orders">3 orders</button><button type="button" data-v="plots">3 plot types</button></div></div>
+        <label class="switch"><input type="checkbox" id="key" data-k="key"><span class="track"></span>Answer key</label>
+      </div>
+      <div class="wrap" id="wrap"><div class="paper" id="paper"></div></div>
+      <div class="foot">
+        <span id="sizeInfo"></span>
+        <span>Settings are remembered in this browser · <button class="linkbtn" id="resetBtn" type="button">Reset all</button></span>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+"use strict";
+/* ---------- constants ---------- */
+const ORD_NAME = ["zero", "first", "second"];
+const ORD_TITLE = ["Zero order", "First order", "Second order"];
+const PLOTS = ["conc", "ln", "inv"];
+const SIZES = { small:[3.25,2.5], medium:[4.5,3.25], wide:[6.5,4], square:[4,4], strip:[7.5,3] };
+const FONTS = { Arial:"Arial, Helvetica, 'Liberation Sans', sans-serif", Helvetica:"Helvetica, Arial, 'Liberation Sans', sans-serif",
+  Times:"'Times New Roman', Times, 'Liberation Serif', serif", Verdana:"Verdana, Geneva, 'DejaVu Sans', sans-serif" };
+const DASH = ["", "6 3", "1.2 2.4", "7 2.5 1.5 2.5"];
+const SHAPES = ["circle", "square", "triangle", "diamond"];
+const FILLED = [true, false, true, false];
+const COLORS = ["#0072B2", "#D55E00", "#009E73", "#B4457F"];
+const GRID = { light:["#C9C9C9","#E6E6E6"], medium:["#9E9E9E","#D0D0D0"], dark:["#6E6E6E","#B0B0B0"] };
+const LS_KEY = "kinetics-graph-maker-v1";
+
+const DEFAULTS = {
+  species:"A", concUnit:"M", timeUnit:"s",
+  order:1, plot:"conc", layout:"single",
+  series:[{A0:1.0, k:0.1, label:""}],
+  showLine:true, showPoints:true, nPoints:7, noisy:false, noise:4, seed:7, fitLine:true,
+  tangentOn:false, tangentT:5, tangentSeries:0, key:false,
+  tAuto:true, tMax:30, tStep:5,
+  yAuto:true, yZero:true, yMin:0, yMax:1, yStep:0.2,
+  minorDiv:"auto", xDec:"auto", yDec:"auto",
+  title:"", xLabel:"", yLabel:"",
+  size:"medium", w:4.5, h:3.25, fontFamily:"Arial", fontScale:100, lineW:1.5,
+  gridMajor:true, gridMinor:false, gridTone:"medium", frame:false, ticksOut:true,
+  legendShow:"auto", legendPos:"auto", color:false, panelLetters:true, dpi:300
+};
+
+let S = load();
+function load(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){ const o = JSON.parse(raw); return Object.assign(structuredClone(DEFAULTS), o); }
+  }catch(e){}
+  return structuredClone(DEFAULTS);
+}
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){} }
+
+/* ---------- math ---------- */
+const conc = (o,A0,k,t) => o===0 ? A0-k*t : o===1 ? A0*Math.exp(-k*t) : 1/(1/A0+k*t);
+const dconc = (o,A0,k,t) => { const A=conc(o,A0,k,t); return o===0 ? -k : o===1 ? -k*A : -k*A*A; };
+const tr = (p,A) => p==="conc" ? A : p==="ln" ? Math.log(A) : 1/A;
+const dtr = (p,A,dA) => p==="conc" ? dA : p==="ln" ? dA/A : -dA/(A*A);
+const floorA = (p,A0) => p==="conc" ? -Infinity : p==="ln" ? 0.02*A0 : 0.1*A0;
+const isLinear = P => (P.order===0&&P.plot==="conc")||(P.order===1&&P.plot==="ln")||(P.order===2&&P.plot==="inv");
+const halfLife = (o,A0,k) => o===0 ? A0/(2*k) : o===1 ? Math.LN2/k : 1/(k*A0);
+const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
+function goodSeries(){ return S.series.map(s=>({A0:+s.A0>0?+s.A0:1, k:+s.k>0?+s.k:0.1, label:s.label||""})); }
+
+function autoT(order, series){
+  let t = 0;
+  for(const s of series){
+    t = Math.max(t, order===0 ? s.A0/s.k : order===1 ? 4*Math.LN2/s.k : 4/(s.k*s.A0));
+  }
+  return t || 1;
+}
+function niceStep(range, target){
+  const raw = range/target, p = 10**Math.floor(Math.log10(raw)), m = raw/p;
+  const s = m<1.5 ? 1 : m<2.25 ? 2 : m<3.5 ? 2.5 : m<7.5 ? 5 : 10;
+  return s*p;
+}
+function decimals(step){
+  let d=0; while(d<6 && Math.abs(Math.round(step*10**d)-step*10**d) > 1e-6*Math.max(1,step*10**d)) d++;
+  return d;
+}
+function rng(seed){ let a = seed>>>0; return () => { a=(a+0x6D2B79F5)|0; let t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }
+function gauss(r){ let u=0; while(u===0) u=r(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*r()); }
+function linfit(pts){
+  const n=pts.length; if(n<2) return null;
+  let sx=0,sy=0,sxx=0,sxy=0,syy=0;
+  for(const [x,y] of pts){ sx+=x; sy+=y; sxx+=x*x; sxy+=x*y; syy+=y*y; }
+  const d = n*sxx-sx*sx; if(!d) return null;
+  const m=(n*sxy-sx*sy)/d, b=(sy-m*sx)/n;
+  const ssTot = syy - sy*sy/n; let ssRes=0;
+  for(const [x,y] of pts){ ssRes += (y-(m*x+b))**2; }
+  return { m, b, r2: ssTot>0 ? 1-ssRes/ssTot : 1 };
+}
+
+/* ---------- text helpers ---------- */
+const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const r2 = v => Math.round(v*100)/100;
+function fmt(v, sig=3){
+  if(!isFinite(v)) return "—";
+  if(v===0) return "0";
+  const a = Math.abs(v); let s;
+  if(a>=1e5 || a<1e-3){
+    let e = Math.floor(Math.log10(a)), m = (v/10**e).toPrecision(sig);
+    if(Math.abs(parseFloat(m))>=10){ e++; m=(v/10**e).toPrecision(sig); }
+    s = m + " × 10^{" + e + "}";
+  } else if(a>=1000) s = String(Math.round(v));
+  else s = v.toPrecision(sig);
+  return s.replace(/-/g,"−");
+}
+function speciesRich(sp){
+  sp = (sp||"A").trim() || "A";
+  return sp.includes("_{") ? sp : sp.replace(/([A-Za-z)\]])(\d+)/g, "$1_{$2}");
+}
+function richHTML(s){
+  return esc(s).replace(/_\{([^}]*)\}/g,"<sub>$1</sub>").replace(/\^\{([^}]*)\}/g,"<sup>$1</sup>");
+}
+function segs(str){
+  const out=[], re=/([_^])\{([^}]*)\}/g; let last=0, m;
+  while((m=re.exec(str))){ if(m.index>last) out.push(["n",str.slice(last,m.index)]); out.push([m[1]==="_"?"b":"p", m[2]]); last=re.lastIndex; }
+  if(last<str.length) out.push(["n",str.slice(last)]);
+  return out;
+}
+function richSVG(str, size){
+  let cur=0, h="";
+  for(const [k,t] of segs(str)){
+    const target = k==="b" ? size*0.3 : k==="p" ? -size*0.4 : 0;
+    const fsz = k==="n" ? size : size*0.7, dy = target-cur; cur = target;
+    h += `<tspan font-size="${r2(fsz)}"${dy?` dy="${r2(dy)}"`:""}>${esc(t)}</tspan>`;
+  }
+  return h;
+}
+const mctx = document.createElement("canvas").getContext("2d");
+function measure(str, size, bold){
+  mctx.font = `${bold?"bold ":""}${size}px ${FONTS[S.fontFamily]}`;
+  let w=0; for(const [k,t] of segs(str)) { mctx.font = `${bold?"bold ":""}${k==="n"?size:size*0.7}px ${FONTS[S.fontFamily]}`; w += mctx.measureText(t).width; }
+  return w;
+}
+function T(x, y, str, size, o={}){
+  const a = [`x="${r2(x)}"`, `y="${r2(y)}"`, `font-size="${r2(size)}"`, `xml:space="preserve"`, `fill="#000"`];
+  if(o.anchor) a.push(`text-anchor="${o.anchor}"`);
+  if(o.bold) a.push(`font-weight="bold"`);
+  if(o.transform) a.push(`transform="${o.transform}"`);
+  if(o.halo) a.push(`stroke="#fff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"`);
+  return `<text ${a.join(" ")}>${richSVG(str,size)}</text>`;
+}
+function units(){
+  const c=S.concUnit, t=S.timeUnit;
+  return { c, t,
+    k:[`${c} ${t}^{−1}`, `${t}^{−1}`, `${c}^{−1} ${t}^{−1}`],
+    slope:{ conc:`${c} ${t}^{−1}`, ln:`${t}^{−1}`, inv:`${c}^{−1} ${t}^{−1}` } };
+}
+function yLabelFor(plot){
+  const sp = speciesRich(S.species), c = S.concUnit;
+  return plot==="conc" ? `[${sp}] (${c})` : plot==="ln" ? `ln[${sp}]` : `1/[${sp}] (${c}^{−1})`;
+}
+function plotTitle(plot){
+  const sp = speciesRich(S.species);
+  return plot==="conc" ? `[${sp}] vs. time` : plot==="ln" ? `ln[${sp}] vs. time` : `1/[${sp}] vs. time`;
+}
+
+/* ---------- marks ---------- */
+function styleOf(i){ return { color: S.color ? COLORS[i] : "#000", dash: DASH[i], shape: SHAPES[i], filled: FILLED[i] }; }
+function marker(i, x, y, r){
+  const st = styleOf(i), sw = r2(Math.max(0.9, S.lineW*0.7));
+  const fill = st.filled ? st.color : "#fff";
+  const a = `fill="${fill}" stroke="${st.color}" stroke-width="${sw}"`;
+  if(st.shape==="circle") return `<circle cx="${r2(x)}" cy="${r2(y)}" r="${r2(r)}" ${a}/>`;
+  if(st.shape==="square"){ const s=r*0.9; return `<rect x="${r2(x-s)}" y="${r2(y-s)}" width="${r2(2*s)}" height="${r2(2*s)}" ${a}/>`; }
+  if(st.shape==="triangle"){ const s=r*1.2; return `<path d="M${r2(x)} ${r2(y-s)}L${r2(x+s*0.95)} ${r2(y+s*0.65)}L${r2(x-s*0.95)} ${r2(y+s*0.65)}Z" ${a}/>`; }
+  const s=r*1.2; return `<path d="M${r2(x)} ${r2(y-s)}L${r2(x+s)} ${r2(y)}L${r2(x)} ${r2(y+s)}L${r2(x-s)} ${r2(y)}Z" ${a}/>`;
+}
+function lineSample(i, x1, x2, y, withLine, withMarker, r){
+  const st = styleOf(i); let h="";
+  if(withLine) h += `<line x1="${r2(x1)}" y1="${r2(y)}" x2="${r2(x2)}" y2="${r2(y)}" stroke="${st.color}" stroke-width="${S.lineW}" stroke-dasharray="${st.dash}" stroke-linecap="${i===2?"round":"butt"}"/>`;
+  if(withMarker) h += marker(i, (x1+x2)/2, y, r);
+  return h;
+}
+
+/* ---------- curve data ---------- */
+function makeCurve(P, s, i, tMax){
+  const fl = floorA(P.plot, s.A0), line = [], N = 260;
+  for(let j=0;j<=N;j++){
+    const t = tMax*j/N; let A = conc(P.order, s.A0, s.k, t);
+    if(P.plot==="conc"){ line.push([t, Math.max(0,A)]); continue; }
+    if(A<=fl) { // finish exactly at the cutoff so the curve ends cleanly
+      if(P.order===0){ const tc=(s.A0-fl)/s.k; if(tc>0) line.push([tc, tr(P.plot,fl)]); }
+      break;
+    }
+    line.push([t, tr(P.plot,A)]);
+  }
+  const pts = [], r = rng(S.seed*1000 + i*131 + 1), n = Math.max(2, S.nPoints|0), dt = tMax/(n-1);
+  for(let j=0;j<n;j++){
+    const t = dt*j; let A = conc(P.order, s.A0, s.k, t);
+    const depleted = A <= 0;
+    if(P.plot==="conc") A = Math.max(0,A);
+    const g = gauss(r);
+    if(S.noisy && j>0) A = A*(1 + g*S.noise/100);
+    if(P.plot!=="conc" && (A<=fl || A<=0)) continue;
+    const p = [t, tr(P.plot, A)]; p.depleted = depleted;
+    pts.push(p);
+  }
+  let fit = null, fitLine = null;
+  if(isLinear(P)){
+    const live = pts.filter(p=>!p.depleted); // zero order: points after [A] hits 0 are not on the line
+    if(S.noisy && S.fitLine){ fit = linfit(live); }
+    if(fit){ const te = live.length ? live[live.length-1][0] : tMax; fitLine = [[0, fit.b],[te, fit.m*te+fit.b]]; }
+  }
+  return { s, line: fitLine || line, pts, fit };
+}
+
+/* ---------- panel ---------- */
+function panelSVG(P, x0, y0, pw, ph, uid){
+  const fs = S.fontScale/100;
+  const F = { tick:9.5*fs, label:11*fs, title:11*fs, legend:9*fs, key:8.75*fs };
+  const u = units(), series = goodSeries(), mr = 2.9*Math.sqrt(fs)*(0.8+S.lineW*0.14);
+
+  // time axis
+  let tMax, tStep;
+  if(S.tAuto){ const raw = autoT(P.order, series); tStep = niceStep(raw,5); tMax = Math.ceil(raw/tStep-1e-9)*tStep; }
+  else { tMax = +S.tMax>0 ? +S.tMax : 10; tStep = +S.tStep>0 ? +S.tStep : niceStep(tMax,5); if(tMax/tStep>40) tStep = niceStep(tMax,5); }
+
+  const curves = series.map((s,i) => makeCurve(P, s, i, tMax));
+
+  // tangent
+  let tan = null;
+  if(S.tangentOn){
+    const si = clamp(S.tangentSeries|0, 0, series.length-1), s = series[si];
+    const t = clamp(+S.tangentT||0, 0, tMax), A = conc(P.order, s.A0, s.k, t);
+    if(A > Math.max(floorA(P.plot,s.A0), 0)) tan = { t, si, y: tr(P.plot,A), m: dtr(P.plot, A, dconc(P.order,s.A0,s.k,t)) };
+  }
+
+  // y axis
+  let ys = [];
+  curves.forEach(c => { if(S.showLine) c.line.forEach(p=>ys.push(p[1])); if(S.showPoints) c.pts.forEach(p=>ys.push(p[1])); });
+  if(!ys.length) curves.forEach(c => c.line.forEach(p=>ys.push(p[1])));
+  if(tan) ys.push(tan.y);
+  let lo, hi, yStep;
+  if(!S.yAuto && S.layout!=="plots"){
+    lo = +S.yMin||0; hi = +S.yMax; if(!(hi>lo)) hi = lo+1;
+    yStep = +S.yStep>0 ? +S.yStep : niceStep(hi-lo,5); if((hi-lo)/yStep>40) yStep = niceStep(hi-lo,5);
+  } else {
+    lo = Math.min(...ys); hi = Math.max(...ys);
+    if(S.yZero && P.plot!=="ln") lo = Math.min(0, lo);
+    if(hi-lo < 1e-12) { hi += Math.abs(hi)*0.1 + 1; }
+    yStep = niceStep(hi-lo, 5);
+    lo = Math.floor(lo/yStep + 1e-9)*yStep; hi = Math.ceil(hi/yStep - 1e-9)*yStep;
+  }
+  const xd = S.xDec==="auto" ? decimals(tStep) : +S.xDec, yd = S.yDec==="auto" ? decimals(yStep) : +S.yDec;
+  const tickFmt = (v,d) => (Math.abs(v) < 1e-9*Math.max(1,Math.abs(hi)) ? 0 : v).toFixed(d).replace("-","−");
+  const xt = [], yt = [];
+  for(let v=0; v<=tMax+tStep*1e-6; v+=tStep) xt.push(v);
+  for(let n=0, v=lo; v<=hi+yStep*1e-6; n++, v=lo+n*yStep) yt.push(v);
+  const minorN = S.minorDiv==="auto" ? (Math.abs(yStep/10**Math.floor(Math.log10(yStep)) - 2) < 1e-6 ? 4 : 5) : +S.minorDiv;
+  const minorNx = S.minorDiv==="auto" ? (Math.abs(tStep/10**Math.floor(Math.log10(tStep)) - 2) < 1e-6 ? 4 : 5) : +S.minorDiv;
+
+  // margins
+  const tickOut = S.ticksOut ? 4 : 0, tickLen = 4;
+  const yLabs = yt.map(v=>tickFmt(v,yd)), xLabs = xt.map(v=>tickFmt(v,xd));
+  const yTickW = Math.max(...yLabs.map(l=>measure(l,F.tick)));
+  const title = P.title || "";
+  const left = 3 + F.label + 7 + yTickW + 4 + tickOut;
+  const right = Math.max(8, measure(xLabs[xLabs.length-1]||"",F.tick)/2 + 3);
+  const top = title ? F.title*1.55 + 4 : Math.max(7, F.tick*0.6 + 2);
+  const bottom = tickOut + 4 + F.tick + 6 + F.label + 4;
+  const X0 = x0+left, X1 = x0+pw-right, Y0 = y0+top, Y1 = y0+ph-bottom;
+  if(X1-X0 < 20 || Y1-Y0 < 20) return "";
+  const sx = t => X0 + (t/tMax)*(X1-X0);
+  const sy = v => Y1 - (v-lo)/(hi-lo)*(Y1-Y0);
+
+  let g = `<defs><clipPath id="clip${uid}"><rect x="${r2(X0)}" y="${r2(Y0)}" width="${r2(X1-X0)}" height="${r2(Y1-Y0)}"/></clipPath></defs>`;
+
+  // grid
+  const [gMaj, gMin] = GRID[S.gridTone] || GRID.medium;
+  if(S.gridMinor){
+    let d="";
+    for(let i=0;i<xt.length;i++) for(let j=1;j<minorNx;j++){ const v=xt[i]+tStep*j/minorNx; if(v<tMax-1e-9) d+=`M${r2(sx(v))} ${r2(Y0)}V${r2(Y1)}`; }
+    for(let i=0;i<yt.length;i++) for(let j=1;j<minorN;j++){ const v=yt[i]+yStep*j/minorN; if(v<hi-1e-9) d+=`M${r2(X0)} ${r2(sy(v))}H${r2(X1)}`; }
+    g += `<path d="${d}" stroke="${gMin}" stroke-width="0.4" fill="none"/>`;
+  }
+  if(S.gridMajor){
+    let d="";
+    xt.forEach(v=>{ if(v>1e-9) d+=`M${r2(sx(v))} ${r2(Y0)}V${r2(Y1)}`; });
+    yt.forEach(v=>{ if(v>lo+1e-9*(hi-lo)) d+=`M${r2(X0)} ${r2(sy(v))}H${r2(X1)}`; });
+    g += `<path d="${d}" stroke="${gMaj}" stroke-width="0.55" fill="none"/>`;
+  }
+
+  // lines
+  const samples = [];
+  if(S.showLine) curves.forEach((c,i) => {
+    const st = styleOf(i);
+    const d = c.line.map((p,j)=>`${j?"L":"M"}${r2(sx(p[0]))} ${r2(sy(p[1]))}`).join("");
+    g += `<path d="${d}" clip-path="url(#clip${uid})" fill="none" stroke="${st.color}" stroke-width="${S.lineW}" stroke-dasharray="${st.dash}" stroke-linejoin="round" stroke-linecap="${i===2?"round":"butt"}"/>`;
+    // sample for placement (interpolate fit lines)
+    if(c.line.length===2){ for(let j=0;j<=40;j++){ const a=c.line[0], b=c.line[1], f=j/40; samples.push([sx(a[0]+(b[0]-a[0])*f), sy(a[1]+(b[1]-a[1])*f)]); } }
+    else c.line.forEach(p=>samples.push([sx(p[0]), sy(p[1])]));
+  });
+
+  // tangent
+  let tanLabel = null;
+  if(tan){
+    const span = tMax*0.28, t1 = tan.t-span, t2 = tan.t+span;
+    const xA=sx(t1), yA=sy(tan.y+tan.m*(t1-tan.t)), xB=sx(t2), yB=sy(tan.y+tan.m*(t2-tan.t));
+    g += `<line x1="${r2(xA)}" y1="${r2(yA)}" x2="${r2(xB)}" y2="${r2(yB)}" stroke="#000" stroke-width="${r2(Math.max(0.8,S.lineW*0.65))}" clip-path="url(#clip${uid})"/>`;
+    for(let j=0;j<=20;j++) samples.push([xA+(xB-xA)*j/20, yA+(yB-yA)*j/20]);
+    if(S.key){
+      const txt = `slope = ${fmt(tan.m)} ${u.slope[P.plot]}`, w = measure(txt, F.key);
+      const px = sx(tan.t), py = sy(tan.y);
+      let ty = tan.m<0 ? py - 9 : py + 9 + F.key*0.7, tx = px + 8, anchor = "start";
+      if(tx + w > X1 - 2){ tx = px - 8; anchor = "end"; }
+      tanLabel = { svg: T(tx, ty, txt, F.key, {anchor, halo:true}), box:[anchor==="start"?tx:tx-w, ty-F.key*0.8, w, F.key*1.1] };
+    }
+  }
+
+  // points
+  if(S.showPoints) curves.forEach((c,i) => c.pts.forEach(([t,v]) => {
+    if(v<lo-1e-9*(hi-lo) || v>hi+1e-9*(hi-lo) || t>tMax+1e-9) return;
+    g += marker(i, sx(t), sy(v), mr); samples.push([sx(t), sy(v)]);
+  }));
+  if(tan){ g += `<circle cx="${r2(sx(tan.t))}" cy="${r2(sy(tan.y))}" r="${r2(mr*0.85)}" fill="#fff" stroke="#000" stroke-width="${r2(Math.max(0.9,S.lineW*0.7))}"/>`; }
+
+  // axes
+  const aw = 1;
+  let ax = `M${r2(X0)} ${r2(Y0)}V${r2(Y1)}H${r2(X1)}`;
+  if(S.frame) ax += `V${r2(Y0)}H${r2(X0)}`;
+  g += `<path d="${ax}" fill="none" stroke="#000" stroke-width="${aw}" stroke-linecap="square"/>`;
+  let tk = "";
+  const dir = S.ticksOut ? 1 : -1;
+  xt.forEach(v=>{ const x=r2(sx(v)); tk+=`M${x} ${r2(Y1)}v${dir*tickLen}`; if(S.frame) tk+=`M${x} ${r2(Y0)}v${-dir*tickLen}`; });
+  yt.forEach(v=>{ const y=r2(sy(v)); tk+=`M${r2(X0)} ${y}h${-dir*tickLen}`; if(S.frame) tk+=`M${r2(X1)} ${y}h${dir*tickLen}`; });
+  for(let i=0;i<xt.length;i++) for(let j=1;j<minorNx;j++){ const v=xt[i]+tStep*j/minorNx; if(v<tMax-1e-9){ tk+=`M${r2(sx(v))} ${r2(Y1)}v${dir*tickLen*0.55}`; } }
+  for(let i=0;i<yt.length;i++) for(let j=1;j<minorN;j++){ const v=yt[i]+yStep*j/minorN; if(v<hi-1e-9){ tk+=`M${r2(X0)} ${r2(sy(v))}h${-dir*tickLen*0.55}`; } }
+  g += `<path d="${tk}" stroke="#000" stroke-width="0.8" fill="none"/>`;
+
+  // tick labels
+  xt.forEach((v,i)=>{ g += T(sx(v), Y1+tickOut+3+F.tick*0.8, xLabs[i], F.tick, {anchor:"middle"}); });
+  yt.forEach((v,i)=>{ g += T(X0-tickOut-4, sy(v)+F.tick*0.35, yLabs[i], F.tick, {anchor:"end"}); });
+
+  // axis labels
+  const xl = S.xLabel.trim() || `Time (${u.t})`;
+  const yl = (S.layout==="plots" ? "" : S.yLabel.trim()) || yLabelFor(P.plot);
+  g += T((X0+X1)/2, y0+ph-4-F.label*0.2, xl, F.label, {anchor:"middle"});
+  const lx = x0+3+F.label*0.8, ly = (Y0+Y1)/2;
+  g += T(lx, ly, yl, F.label, {anchor:"middle", transform:`rotate(-90 ${r2(lx)} ${r2(ly)})`});
+  if(title) g += T((X0+X1)/2, y0+F.title*1.1, title, F.title, {anchor:"middle", bold:true});
+
+  // boxes: tangent label, legend, key
+  const placed = [];
+  if(tanLabel){ g += tanLabel.svg; placed.push(tanLabel.box); }
+  const inset = 5;
+  const spots = { tr:(w,h)=>[X1-inset-w, Y0+inset], tl:(w,h)=>[X0+inset, Y0+inset], br:(w,h)=>[X1-inset-w, Y1-inset-h], bl:(w,h)=>[X0+inset, Y1-inset-h],
+                  tc:(w,h)=>[(X0+X1-w)/2, Y0+inset], rm:(w,h)=>[X1-inset-w, (Y0+Y1-h)/2] };
+  const overlaps = (a,b) => a[0]<b[0]+b[2] && b[0]<a[0]+a[2] && a[1]<b[1]+b[3] && b[1]<a[1]+a[3];
+  function place(w, h, pref){
+    const fit = ([x,y]) => [Math.max(x0+2, Math.min(x, X1-w)), y];
+    if(pref && pref!=="auto" && spots[pref]) return fit(spots[pref](w,h));
+    let best=null, bestScore=Infinity;
+    for(const key of ["tr","tl","br","bl","tc","rm"]){
+      const [x,y] = spots[key](w,h), box=[x-2,y-2,w+4,h+4];
+      let score = 0;
+      for(const [px,py] of samples) if(px>=box[0]&&px<=box[0]+box[2]&&py>=box[1]&&py<=box[1]+box[3]) score++;
+      for(const b of placed) if(overlaps(box,b)) score += 1000;
+      if(score < bestScore - 0.5){ bestScore=score; best=[x,y]; }
+    }
+    return fit(best);
+  }
+
+  const n = series.length;
+  // in 3-panel layouts every panel shares the same curve styles, so the legend appears once
+  const showLegend = (S.legendShow==="on" || (S.legendShow==="auto" && n>1)) && (S.layout==="single" || uid===0);
+  if(showLegend){
+    const sp = speciesRich(S.species);
+    const varyA = new Set(series.map(s=>s.A0)).size>1, varyK = new Set(series.map(s=>s.k)).size>1;
+    const labels = series.map((s,i)=>{
+      if(s.label.trim()) return s.label.trim();
+      const parts = [];
+      if(varyA || n===1) parts.push(`[${sp}]_{0} = ${fmt(s.A0)} ${u.c}`);
+      if(varyK || n===1) parts.push(`k = ${fmt(s.k)} ${u.k[P.order]}`);
+      return parts.join(", ") || `Run ${i+1}`;
+    });
+    const pad=5, sw=22, rowH=F.legend*1.5;
+    const w = pad*2 + sw + 6 + Math.max(...labels.map(l=>measure(l,F.legend)));
+    const h = pad*1.2 + n*rowH;
+    const [bx,by] = place(w,h,S.legendPos);
+    g += `<rect x="${r2(bx)}" y="${r2(by)}" width="${r2(w)}" height="${r2(h)}" fill="#fff" stroke="#000" stroke-width="0.6"/>`;
+    labels.forEach((l,i)=>{
+      const cy = by + pad*0.6 + rowH*(i+0.5);
+      g += lineSample(i, bx+pad, bx+pad+sw, cy, S.showLine, S.showPoints || !S.showLine, mr);
+      g += T(bx+pad+sw+6, cy+F.legend*0.35, l, F.legend);
+    });
+    placed.push([bx,by,w,h]);
+  }
+
+  if(S.key){
+    const lin = isLinear(P), tested = {conc:0,ln:1,inv:2}[P.plot];
+    const rows = [{txt: lin ? `Linear → ${ORD_NAME[P.order]} order` : `Curved → not ${ORD_NAME[tested]} order`, bold:true}];
+    const compact = (X1-X0) < 290;
+    curves.forEach((c,i)=>{
+      const mk = n>1 ? i : null;
+      if(compact){
+        const k = lin && c.fit ? Math.abs(c.fit.m) : c.s.k;
+        let txt = lin ? `k = ${fmt(k)} ${u.k[P.order]}` : `${ORD_NAME[P.order]} order, k = ${fmt(k)} ${u.k[P.order]}`;
+        if(lin && c.fit) txt += ` (R^{2} = ${c.fit.r2.toFixed(3)})`;
+        rows.push({txt, mk});
+      } else if(lin){
+        const m = c.fit ? c.fit.m : (P.order===2 ? c.s.k : -c.s.k);
+        const k = Math.abs(m), A0 = c.fit ? (P.plot==="conc" ? c.fit.b : P.plot==="ln" ? Math.exp(c.fit.b) : 1/c.fit.b) : c.s.A0;
+        rows.push({txt:`slope = ${fmt(m)} ${u.slope[P.plot]}, k = ${fmt(k)} ${u.k[P.order]}`, mk});
+        let second = `t_{1/2} = ${fmt(halfLife(P.order, A0, k))} ${u.t}`;
+        if(c.fit) second += `,  R^{2} = ${c.fit.r2.toFixed(4)}`;
+        rows.push({txt:second, indent: n>1});
+      } else {
+        rows.push({txt:`Actual: ${ORD_NAME[P.order]} order, k = ${fmt(c.s.k)} ${u.k[P.order]}`, mk});
+      }
+    });
+    const pad=5, rowH=F.key*1.45, mw = n>1 ? 11 : 0;
+    const w = pad*2 + mw + Math.max(...rows.map(r=>measure(r.txt,F.key,r.bold)));
+    const h = pad*1.2 + rows.length*rowH;
+    const [bx,by] = place(w,h,"auto");
+    g += `<rect x="${r2(bx)}" y="${r2(by)}" width="${r2(w)}" height="${r2(h)}" fill="#fff" stroke="#000" stroke-width="0.6" stroke-dasharray="2 1.5"/>`;
+    rows.forEach((r,j)=>{
+      const cy = by + pad*0.6 + rowH*(j+0.5);
+      if(r.mk!=null && r.mk!==undefined) g += marker(r.mk, bx+pad+4, cy, mr*0.8);
+      g += T(bx+pad+((r.mk!=null||r.indent)?mw:0), cy+F.key*0.35, r.txt, F.key, {bold:r.bold});
+    });
+  }
+  return `<g>${g}</g>`;
+}
+
+/* ---------- figure ---------- */
+function figureSVG(outW, outH){
+  const W = S.w*72, H = S.h*72;
+  let panels;
+  if(S.layout==="orders") panels = [0,1,2].map(o=>({order:o, plot:S.plot, title:ORD_TITLE[o]}));
+  else if(S.layout==="plots") panels = PLOTS.map(p=>({order:S.order, plot:p, title:plotTitle(p)}));
+  else panels = [{order:S.order, plot:S.plot, title:S.title.trim()}];
+  const n = panels.length, fs = S.fontScale/100;
+  let top = 0, body = "";
+  if(n>1){
+    if(S.title.trim()){ const ts = 12*fs; top = ts*1.7; body += T(W/2, ts*1.25, S.title.trim(), ts, {anchor:"middle", bold:true}); }
+    panels.forEach((P,i)=>{ if(S.panelLetters) P.title = `(${"abc"[i]}) ${P.title}`; });
+  }
+  const gap = n>1 ? 10 : 0, pw = (W - gap*(n-1))/n;
+  panels.forEach((P,i)=>{ body += panelSVG(P, i*(pw+gap), top, pw, H-top, i); });
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${outW}" height="${outH}" viewBox="0 0 ${r2(W)} ${r2(H)}" font-family="${FONTS[S.fontFamily]}"><rect width="${r2(W)}" height="${r2(H)}" fill="#fff"/>${body}</svg>`;
+}
+
+/* ---------- UI ---------- */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+
+function swatch(i){
+  return `<svg viewBox="0 0 30 18" aria-hidden="true"><rect width="30" height="18" rx="3" fill="#fff"/>${lineSample(i,2,28,9,true,true,3)}</svg>`;
+}
+function renderSeries(){
+  const u = units(), sp = speciesRich(S.species);
+  $("#seriesHead").innerHTML = `<span></span><span>${richHTML(`[${sp}]_{0}`)} (${esc(u.c)})</span><span>k (${richHTML(u.k[S.order])})</span><span>Legend label</span><span></span>`;
+  $("#seriesRows").innerHTML = S.series.map((s,i)=>`
+    <div class="srow">${swatch(i)}
+      <input type="number" step="any" min="0" id="s${i}A0" data-si="${i}" data-sf="A0" value="${esc(s.A0)}" aria-label="Initial concentration, curve ${i+1}">
+      <input type="number" step="any" min="0" id="s${i}k" data-si="${i}" data-sf="k" value="${esc(s.k)}" aria-label="Rate constant, curve ${i+1}">
+      <input type="text" id="s${i}label" data-si="${i}" data-sf="label" value="${esc(s.label)}" placeholder="auto" aria-label="Legend label, curve ${i+1}">
+      <button class="icon-btn" type="button" data-remove="${i}" ${S.series.length<2?"disabled":""} aria-label="Remove curve ${i+1}">
+        <svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 2.5l7 7m0-7l-7 7"/></svg></button>
+    </div>`).join("");
+  $("#addSeries").disabled = S.series.length>=4;
+  $("#tangentSeries").innerHTML = S.series.map((s,i)=>`<option value="${i}">Curve ${i+1}</option>`).join("");
+  $("#tangentSeries").value = String(clamp(S.tangentSeries,0,S.series.length-1));
+}
+function syncControls(){
+  $$("[data-k]").forEach(el=>{
+    const v = S[el.dataset.k];
+    if(el.type==="checkbox") el.checked = !!v;
+    else if(document.activeElement!==el) el.value = v;
+  });
+  $$("[data-seg]").forEach(seg=>{
+    const k = seg.dataset.seg;
+    seg.querySelectorAll("button").forEach(b=>{
+      const v = seg.dataset.bool ? String(+S[k]) : String(S[k]);
+      b.setAttribute("aria-pressed", String(b.dataset.v===v));
+    });
+  });
+  // plot segment labels use the species name
+  const sp = richHTML(speciesRich(S.species));
+  const labels = { conc:`[${sp}]`, ln:`ln[${sp}]`, inv:`1/[${sp}]` };
+  $$("#plotSeg button").forEach(b=> b.innerHTML = labels[b.dataset.v]);
+  // availability
+  $$("#orderSeg button").forEach(b=> b.disabled = S.layout==="orders");
+  $$("#plotSeg button").forEach(b=> b.disabled = S.layout==="plots");
+  $("#tMax").disabled = $("#tStep").disabled = S.tAuto;
+  ["#yMin","#yMax","#yStep"].forEach(id=> $(id).disabled = S.yAuto || S.layout==="plots");
+  $("#yLabel").disabled = S.layout==="plots";
+  $("#noise").disabled = $("#reroll").disabled = !S.noisy;
+  $("#fitLine").disabled = !S.noisy;
+  $("#tangentT").disabled = $("#tangentSeries").disabled = !S.tangentOn;
+  $("#panelLetters").disabled = S.layout==="single";
+  $("#nPointsVal").textContent = S.nPoints;
+  $("#noiseVal").textContent = `±${S.noise}%`;
+  $("#fontScaleVal").textContent = `${S.fontScale}%`;
+  $("#tangentUnit").textContent = S.timeUnit;
+}
+
+let raf = 0;
+function update(full){
+  if(full) renderSeries();
+  syncControls();
+  save();
+  cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(draw);
+}
+function draw(){
+  const wrap = $("#wrap"), paper = $("#paper");
+  const cs = getComputedStyle(wrap);
+  const aw = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const ah = wrap.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  const ratio = S.w/S.h;
+  let w = Math.max(100, Math.min(aw, ah*ratio)), h = w/ratio;
+  paper.innerHTML = figureSVG(Math.round(w), Math.round(h));
+  const px = Math.round(S.w*S.dpi), py = Math.round(S.h*S.dpi);
+  $("#sizeInfo").innerHTML = `Prints at <b>${S.w} × ${S.h} in</b> · PNG <b>${px} × ${py} px</b> at ${S.dpi} dpi`;
+}
+new ResizeObserver(()=>{ cancelAnimationFrame(raf); raf=requestAnimationFrame(draw); }).observe($("#wrap"));
+
+// generic inputs
+document.addEventListener("input", e=>{
+  const el = e.target;
+  if(el.dataset.sf){
+    const i = +el.dataset.si, f = el.dataset.sf;
+    if(f==="label") S.series[i].label = el.value;
+    else { const v = parseFloat(el.value); if(v>0) S.series[i][f] = v; else return; }
+    update(); return;
+  }
+  const k = el.dataset.k; if(!k) return;
+  let v;
+  if(el.type==="checkbox") v = el.checked;
+  else if(el.type==="number" || el.type==="range" || el.dataset.num){ v = parseFloat(el.value); if(!isFinite(v)) return; }
+  else v = el.value;
+  S[k] = v;
+  if(k==="size" && SIZES[v]){ [S.w,S.h] = SIZES[v]; }
+  if(k==="w"||k==="h") S.size = (Object.entries(SIZES).find(([,d])=>d[0]===S.w&&d[1]===S.h)||["custom"])[0];
+  if(k==="tAuto" && !v){ /* seed manual fields from the current auto range */ const raw=autoT(S.order,goodSeries()); S.tStep=niceStep(raw,5); S.tMax=Math.ceil(raw/S.tStep-1e-9)*S.tStep; }
+  update(k==="species"||k==="concUnit"||k==="timeUnit"||k==="color"||k==="lineW");
+});
+document.addEventListener("change", e=>{ if(e.target.dataset.k==="species"||e.target.dataset.sf) update(true); });
+document.addEventListener("click", e=>{
+  const b = e.target.closest("[data-seg] button");
+  if(b && !b.disabled){
+    const seg = b.parentElement, k = seg.dataset.seg;
+    let v = b.dataset.v;
+    if(seg.dataset.bool) v = v==="1"; else if(seg.dataset.num) v = parseFloat(v);
+    S[k] = v;
+    if(k==="layout"){
+      if(v!=="single" && S.size!=="strip" && S.size!=="custom"){ S.size="strip"; [S.w,S.h]=SIZES.strip; }
+      if(v==="single" && S.size==="strip"){ S.size="medium"; [S.w,S.h]=SIZES.medium; }
+    }
+    update(k==="order"||k==="lineW"); return;
+  }
+  const rm = e.target.closest("[data-remove]");
+  if(rm){ S.series.splice(+rm.dataset.remove,1); S.tangentSeries = clamp(S.tangentSeries,0,S.series.length-1); update(true); return; }
+  const tab = e.target.closest("[data-tab]");
+  if(tab){
+    $$("[data-tab]").forEach(t=>t.setAttribute("aria-selected", String(t===tab)));
+    $$(".pane").forEach(p=> p.hidden = p.id !== "pane-"+tab.dataset.tab);
+    try{ localStorage.setItem(LS_KEY+"-tab", tab.dataset.tab); }catch(err){}
+  }
+});
+$("#addSeries").addEventListener("click", ()=>{
+  if(S.series.length>=4) return;
+  const last = S.series[S.series.length-1] || {A0:1,k:0.1};
+  S.series.push({A0: +(last.A0/2).toPrecision(3), k:last.k, label:""});
+  update(true);
+});
+$("#reroll").addEventListener("click", ()=>{ S.seed = (S.seed*7919 + 13) % 100003; update(); });
+
+let resetArmed = 0;
+$("#resetBtn").addEventListener("click", e=>{
+  if(!resetArmed){ e.target.textContent = "Click again to reset"; resetArmed = setTimeout(()=>{ resetArmed=0; e.target.textContent="Reset all"; }, 3000); return; }
+  clearTimeout(resetArmed); resetArmed = 0; e.target.textContent = "Reset all";
+  S = structuredClone(DEFAULTS); update(true); toast("Settings reset");
+});
+
+/* ---------- export ---------- */
+let toastT;
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"), 2600); }
+
+const CRC = (()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1; t[n]=c>>>0; } return t; })();
+function crc32(b){ let c=0xFFFFFFFF; for(let i=0;i<b.length;i++) c = CRC[(c^b[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+async function setDpi(blob, dpi){
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  const head = new TextDecoder("latin1").decode(buf.subarray(0, Math.min(buf.length, 200)));
+  if(head.includes("pHYs")) return blob;
+  const ppm = Math.round(dpi/0.0254), ch = new Uint8Array(21), dv = new DataView(ch.buffer);
+  dv.setUint32(0, 9); ch.set([112,72,89,115], 4); dv.setUint32(8, ppm); dv.setUint32(12, ppm); ch[16] = 1;
+  dv.setUint32(17, crc32(ch.subarray(4,17)));
+  const out = new Uint8Array(buf.length+21); out.set(buf.subarray(0,33)); out.set(ch,33); out.set(buf.subarray(33),54);
+  return new Blob([out], {type:"image/png"});
+}
+async function pngBlob(){
+  const W = Math.round(S.w*S.dpi), H = Math.round(S.h*S.dpi);
+  const img = new Image();
+  img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(figureSVG(W, H));
+  await img.decode();
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const c = cv.getContext("2d"); c.fillStyle = "#fff"; c.fillRect(0,0,W,H); c.drawImage(img, 0, 0, W, H);
+  const blob = await new Promise(r=>cv.toBlob(r, "image/png"));
+  return setDpi(blob, S.dpi);
+}
+function fileBase(){
+  const plot = {conc:"conc", ln:"ln-conc", inv:"inverse-conc"};
+  if(S.layout==="orders") return `kinetics_3-orders_${plot[S.plot]}${S.key?"_key":""}`;
+  if(S.layout==="plots") return `kinetics_${ORD_NAME[S.order]}-order_3-plots${S.key?"_key":""}`;
+  return `kinetics_${ORD_NAME[S.order]}-order_${plot[S.plot]}${S.key?"_key":""}`;
+}
+let dl = null;
+if(window.claude && typeof window.claude.use==="function"){ window.claude.use("downloads").then(d=>{ dl=d; }).catch(()=>{}); }
+async function saveFile(name, blob){
+  if(dl){
+    try{ await dl.save({filename:name, data:blob}); toast(`Saved ${name}`); }
+    catch(e){ toast(e && e.code==="declined" ? "Download cancelled" : "This view can't save files. Use Copy image instead."); }
+    return;
+  }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  toast(`Downloaded ${name}`);
+}
+async function busy(btn, fn){ btn.disabled = true; try{ await fn(); } finally{ btn.disabled = false; } }
+
+$("#copyBtn").addEventListener("click", e=>{
+  const btn = e.currentTarget;
+  if(!navigator.clipboard || typeof ClipboardItem==="undefined"){ toast("Copying images isn't supported in this browser. Use PNG instead."); return; }
+  busy(btn, async ()=>{
+    try{
+      await navigator.clipboard.write([new ClipboardItem({"image/png": pngBlob()})]);
+      toast("Image copied. Paste it into your document.");
+    }catch(err){ toast("Copy was blocked here. Use the PNG button instead."); }
+  });
+});
+$("#pngBtn").addEventListener("click", e=> busy(e.currentTarget, async ()=> saveFile(fileBase()+".png", await pngBlob())));
+$("#svgBtn").addEventListener("click", e=> busy(e.currentTarget, async ()=> saveFile(fileBase()+".svg",
+  new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n'+figureSVG(S.w+"in", S.h+"in")], {type:"image/svg+xml"}))));
+
+/* ---------- start ---------- */
+try{ const t = localStorage.getItem(LS_KEY+"-tab"); if(t){ const b=document.querySelector(`[data-tab="${t}"]`); if(b) b.click(); } }catch(e){}
+update(true);
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>update());
+})();
+</script>
+</body>
+</html>
