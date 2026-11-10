@@ -74,7 +74,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;background:var(--panel);overflow:hidden;flex:none}
-.seg button{border:0;background:none;padding:0 11px;height:30px;cursor:pointer;white-space:nowrap;color:var(--ink)}
+.seg button{border:0;background:none;padding:0 9px;height:30px;cursor:pointer;white-space:nowrap;color:var(--ink)}
 .seg button+button{border-left:1px solid var(--line)}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 .seg button:disabled{opacity:.4;cursor:not-allowed}
@@ -89,7 +89,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .add{align-self:flex-start}
 
 .stage{display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-width:0;min-height:0}
-.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:12px 20px 4px}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:12px 16px 4px}
 .tgroup{display:flex;align-items:center;gap:8px}
 .tgroup>span{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;user-select:none}
@@ -288,7 +288,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
           <div class="seg" data-seg="plot" id="plotSeg"><button type="button" data-v="conc"></button><button type="button" data-v="ln"></button><button type="button" data-v="inv"></button></div></div>
         <div class="tgroup"><span>Layout</span>
           <div class="seg" data-seg="layout"><button type="button" data-v="single">Single</button><button type="button" data-v="orders">3 orders</button><button type="button" data-v="plots">3 plot types</button></div></div>
-        <label class="switch"><input type="checkbox" id="key" data-k="key"><span class="track"></span>Answer key</label>
+        <div class="tgroup" style="gap:14px"><label class="switch"><input type="checkbox" id="key" data-k="key"><span class="track"></span>Answer key</label>
+        <label class="switch" title="Draw a straight best-fit line on every plot, with its equation and R²"><input type="checkbox" id="exam" data-k="exam"><span class="track"></span>Exam mode</label></div>
       </div>
       <div class="wrap" id="wrap"><div class="paper" id="paper"></div></div>
       <div class="foot">
@@ -322,7 +323,7 @@ const DEFAULTS = {
   order:1, plot:"conc", layout:"single",
   series:[{A0:1.0, k:0.1, label:""}],
   showLine:true, showPoints:true, nPoints:7, noisy:false, noise:4, seed:7, fitLine:true,
-  tangentOn:false, tangentT:5, tangentSeries:0, key:false,
+  tangentOn:false, tangentT:5, tangentSeries:0, key:false, exam:false,
   tAuto:true, tMax:30, tStep:5,
   yAuto:true, yZero:true, yMin:0, yMax:1, yStep:0.2,
   minorDiv:"auto", xDec:"auto", yDec:"auto",
@@ -481,20 +482,19 @@ function makeCurve(P, s, i, tMax){
   const pts = [], r = rng(S.seed*1000 + i*131 + 1), n = Math.max(2, S.nPoints|0), dt = tMax/(n-1);
   for(let j=0;j<n;j++){
     const t = dt*j; let A = conc(P.order, s.A0, s.k, t);
-    const depleted = A <= 0;
+    const depleted = A <= 1e-9*s.A0;
     if(P.plot==="conc") A = Math.max(0,A);
     const g = gauss(r);
     if(S.noisy && j>0) A = A*(1 + g*S.noise/100);
-    if(P.plot!=="conc" && (A<=fl || A<=0)) continue;
+    if(P.plot!=="conc" && (depleted || A<=0)) continue; // keep every real point so all panels show the same data set
     const p = [t, tr(P.plot, A)]; p.depleted = depleted;
     pts.push(p);
   }
   let fit = null, fitLine = null;
-  if(isLinear(P)){
-    const live = pts.filter(p=>!p.depleted); // zero order: points after [A] hits 0 are not on the line
-    if(S.noisy && S.fitLine){ fit = linfit(live); }
-    if(fit){ const te = live.length ? live[live.length-1][0] : tMax; fitLine = [[0, fit.b],[te, fit.m*te+fit.b]]; }
-  }
+  const live = pts.filter(p=>!p.depleted); // zero order: points after [A] hits 0 are not on the line
+  // exam mode: always a straight least-squares line, even when the plot is curved
+  if(S.exam || (isLinear(P) && S.noisy && S.fitLine)) fit = linfit(live);
+  if(fit){ const te = live.length ? live[live.length-1][0] : tMax; fitLine = [[0, fit.b],[te, fit.m*te+fit.b]]; }
   return { s, line: fitLine || line, pts, fit };
 }
 
@@ -678,6 +678,31 @@ function panelSVG(P, x0, y0, pw, ph, uid){
       g += T(bx+pad+sw+6, cy+F.legend*0.35, l, F.legend);
     });
     placed.push([bx,by,w,h]);
+  }
+
+  if(S.exam){
+    const sp = speciesRich(S.species);
+    const yv = {conc:`[${sp}]`, ln:`ln[${sp}]`, inv:`1/[${sp}]`}[P.plot];
+    const rows = [];
+    curves.forEach((c,i)=>{
+      if(!c.fit) return;
+      const {m, b, r2:rr} = c.fit;
+      rows.push({txt:`${yv} = ${fmt(m)}t ${b<0?"−":"+"} ${fmt(Math.abs(b))}`, mk: n>1 ? i : null});
+      rows.push({txt:`R^{2} = ${rr.toFixed(4)}`, indent: n>1});
+    });
+    if(rows.length){
+      const pad=5, rowH=F.key*1.45, mw = n>1 ? 11 : 0;
+      const w = pad*2 + mw + Math.max(...rows.map(r=>measure(r.txt,F.key)));
+      const h = pad*1.2 + rows.length*rowH;
+      const [bx,by] = place(w,h,"auto");
+      g += `<rect x="${r2(bx)}" y="${r2(by)}" width="${r2(w)}" height="${r2(h)}" fill="#fff" stroke="#000" stroke-width="0.6"/>`;
+      rows.forEach((r,j)=>{
+        const cy = by + pad*0.6 + rowH*(j+0.5);
+        if(r.mk!=null) g += marker(r.mk, bx+pad+4, cy, mr*0.8);
+        g += T(bx+pad+((r.mk!=null||r.indent)?mw:0), cy+F.key*0.35, r.txt, F.key);
+      });
+      placed.push([bx,by,w,h]);
+    }
   }
 
   if(S.key){
@@ -896,9 +921,9 @@ async function pngBlob(){
 }
 function fileBase(){
   const plot = {conc:"conc", ln:"ln-conc", inv:"inverse-conc"};
-  if(S.layout==="orders") return `kinetics_3-orders_${plot[S.plot]}${S.key?"_key":""}`;
-  if(S.layout==="plots") return `kinetics_${ORD_NAME[S.order]}-order_3-plots${S.key?"_key":""}`;
-  return `kinetics_${ORD_NAME[S.order]}-order_${plot[S.plot]}${S.key?"_key":""}`;
+  if(S.layout==="orders") return `kinetics_3-orders_${plot[S.plot]}${S.exam?"_exam":""}${S.key?"_key":""}`;
+  if(S.layout==="plots") return `kinetics_${ORD_NAME[S.order]}-order_3-plots${S.exam?"_exam":""}${S.key?"_key":""}`;
+  return `kinetics_${ORD_NAME[S.order]}-order_${plot[S.plot]}${S.exam?"_exam":""}${S.key?"_key":""}`;
 }
 let dl = null;
 if(window.claude && typeof window.claude.use==="function"){ window.claude.use("downloads").then(d=>{ dl=d; }).catch(()=>{}); }
